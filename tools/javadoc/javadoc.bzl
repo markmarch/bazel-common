@@ -20,6 +20,9 @@ def _android_jar(android_api_level):
     return Label("@androidsdk//:platforms/android-%s/android.jar" % android_api_level)
 
 def _javadoc_library(ctx):
+    if ctx.attr.exclude_packages and not ctx.attr.root_packages:
+        fail("Must first specify root_packages.", "exclude_packages")
+
     transitive_deps = []
     for dep in ctx.attr.deps:
         if JavaInfo in dep:
@@ -32,6 +35,8 @@ def _javadoc_library(ctx):
 
     java_home = str(ctx.attr._jdk[java_common.JavaRuntimeInfo].java_home)
 
+    # Documentation for the javadoc command
+    # https://docs.oracle.com/javase/9/javadoc/javadoc-command.htm
     javadoc_command = [
         java_home + "/bin/javadoc",
         "-use",
@@ -44,22 +49,14 @@ def _javadoc_library(ctx):
         "-quiet",
     ]
 
-    # Documentation for the javadoc command
-    # https://docs.oracle.com/javase/9/javadoc/javadoc-command.htm
+    # Document exactly the code in the specified source files.
+    javadoc_command += [f.path for f in ctx.files.srcs]
+
     if ctx.attr.root_packages:
-        # TODO(b/167433657): Reevaluate the utility of root_packages
-        # 1. Find the first directory under the working directory named '*java'.
-        # 2. Assume all files to document can be found by appending a root_package name
-        #    to that directory, or a subdirectory, replacting dots with slashes.
-        javadoc_command += [
-            '-sourcepath $(find * -type d -name "*java" -print0 | tr "\\0" :)',
-            " ".join(ctx.attr.root_packages),
-            "-subpackages",
-            ":".join(ctx.attr.root_packages),
-        ]
-    else:
-        # Document exactly the code in the specified source files.
-        javadoc_command += [f.path for f in ctx.files.srcs]
+        javadoc_command.append("-subpackages %s" % ":".join(ctx.attr.root_packages)
+
+    if ctx.attr.exclude_packages:
+        javadoc_command.append("-exclude %s" % ":".join(ctx.attr.exclude_packages))
 
     if ctx.attr.doctitle:
         javadoc_command.append('-doctitle "%s"' % ctx.attr.doctitle)
@@ -69,9 +66,6 @@ def _javadoc_library(ctx):
         for k, v in ctx.attr.groups.items():
             groups.append("-group \"%s\" \"%s\"" % (k, ":".join(v)))
         javadoc_command.append(" ".join(groups))
-
-    if ctx.attr.exclude_packages:
-        javadoc_command.append("-exclude %s" % ":".join(ctx.attr.exclude_packages))
 
     for link in ctx.attr.external_javadoc_links:
         javadoc_command.append("-linkoffline {0} {0}".format(link))
