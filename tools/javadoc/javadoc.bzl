@@ -53,7 +53,7 @@ def _javadoc_library(ctx):
     javadoc_command += [f.path for f in ctx.files.srcs]
 
     if ctx.attr.root_packages:
-        javadoc_command.append("-subpackages %s" % ":".join(ctx.attr.root_packages)
+        javadoc_command.append("-subpackages %s" % ":".join(ctx.attr.root_packages))
 
     if ctx.attr.exclude_packages:
         javadoc_command.append("-exclude %s" % ":".join(ctx.attr.exclude_packages))
